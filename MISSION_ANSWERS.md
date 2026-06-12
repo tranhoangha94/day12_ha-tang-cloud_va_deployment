@@ -160,8 +160,37 @@ curl.exe http://localhost/ask -X POST -H "Content-Type: application/json" -d "{\
 
 ### Exercise 3.1: Cloud deployment (Vercel)
 
+- **Platform:** Vercel (serverless FastAPI — thay Railway theo yêu cầu lab)
 - **URL:** [https://day12-ha-tang-cloud-va-deployment.vercel.app](https://day12-ha-tang-cloud-va-deployment.vercel.app)
 - **Docs:** [https://day12-ha-tang-cloud-va-deployment.vercel.app/docs](https://day12-ha-tang-cloud-va-deployment.vercel.app/docs)
+- **Chi tiết deploy:** xem [`DEPLOYMENT.md`](DEPLOYMENT.md)
+
+**Cấu hình Vercel:**
+
+| File | Vai trò |
+|------|---------|
+| `api/index.py` | FastAPI app — export `app` (ASGI native, không dùng Mangum) |
+| `vercel.json` | Rewrite all routes → `/api/index` |
+| `requirements.txt` | `fastapi`, `pydantic` |
+| `runtime.txt` | `python-3.11` (tránh lỗi Python 3.12 trên Vercel) |
+
+**Env vars trên Vercel Dashboard → Settings → Environment Variables:**
+
+- `AGENT_API_KEY` = `dev-key-change-me-in-production` (hoặc key riêng)
+
+**Lỗi đã fix:** Build xong nhưng 500 `FUNCTION_INVOCATION_FAILED` do Mangum + Python 3.12. Fix: bỏ Mangum, export `app` trực tiếp, pin Python 3.11.
+
+**Test sau deploy:**
+
+```powershell
+Invoke-RestMethod https://day12-ha-tang-cloud-va-deployment.vercel.app/health
+Invoke-RestMethod https://day12-ha-tang-cloud-va-deployment.vercel.app/ready
+
+Invoke-RestMethod -Uri https://day12-ha-tang-cloud-va-deployment.vercel.app/ask -Method POST `
+  -Headers @{"X-API-Key"="dev-key-change-me-in-production"} `
+  -ContentType "application/json" `
+  -Body '{"user_id":"test","question":"What is deployment?"}'
+```
 
 **Screenshot:** [Mở file ảnh](./screenshot/ex03.png)
 
@@ -320,6 +349,46 @@ Request → Auth (401) → Rate Limit (429) → Cost Check (402/503) → Agent (
 - [x] Hiểu JWT flow: login → token → Bearer header
 - [x] Biết rate limiting dùng Sliding Window, limit 10 req/phút (user)
 - [x] Hiểu cost guard: budget per-user + global, trả 402 khi vượt
+
+---
+
+## Part 5: Scaling & Reliability
+
+> Các concept Part 5 được tích hợp trong `06-lab-complete/` (production stack).
+
+### Exercise 5.1: Health checks
+
+- **`GET /health`** — Liveness probe: trả 200 nếu process còn sống, kèm uptime, checks (Redis, LLM).
+- **`GET /ready`** — Readiness probe: trả 200 khi Redis ping OK; **503** nếu chưa sẵn sàng nhận traffic.
+
+```powershell
+Invoke-RestMethod http://localhost:8888/health
+Invoke-RestMethod http://localhost:8888/ready
+```
+
+### Exercise 5.2: Graceful shutdown
+
+- `lifespan` context manager: set `_is_ready = False` khi shutdown.
+- `signal.signal(SIGTERM, _handle_signal)` — log signal, uvicorn `timeout_graceful_shutdown=30`.
+- Platform (Docker/K8s) gửi SIGTERM → app chờ request in-flight hoàn thành rồi thoát.
+
+### Exercise 5.3: Stateless design
+
+- **Anti-pattern:** `conversation_history = {}` in-memory → mất data khi scale/restart.
+- **Correct:** Redis lưu history (`conv:{user_id}`), rate limit (`rate:{user_id}`), cost (`cost:{user_id}:{YYYY-MM}`).
+- Agent replicas không chia sẻ memory — mọi state qua Redis.
+
+### Exercise 5.4: Load balancing
+
+- Docker Compose: `docker compose up --scale agent=3`
+- Nginx upstream `agent:8000` — Docker DNS round-robin giữa 3 replicas.
+- Client → Nginx (:8888) → Agent 1/2/3 → Redis.
+
+### Exercise 5.5: Test stateless
+
+1. Gửi 2 request cùng `user_id` → `history_turns` tăng (1 → 2) dù request có thể vào replica khác.
+2. Restart 1 agent container → history vẫn còn trong Redis.
+3. `GET /ready` fail khi Redis down → Nginx không route traffic tới agent unhealthy.
 
 ---
 
