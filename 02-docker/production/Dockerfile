@@ -37,12 +37,12 @@ FROM python:3.11-slim AS runtime
 
 # Tạo non-root user — security best practice
 # Chạy với root trong container là bad practice
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
 
 WORKDIR /app
 
-# Copy installed packages từ builder
-COPY --from=builder /root/.local /home/appuser/.local
+# Copy installed packages từ builder (user home = /app)
+COPY --from=builder /root/.local /app/.local
 
 # Copy source code
 COPY 02-docker/production/main.py .
@@ -58,7 +58,7 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # PATH để Python tìm được packages của --user install
-ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PATH=/app/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
 # Expose port

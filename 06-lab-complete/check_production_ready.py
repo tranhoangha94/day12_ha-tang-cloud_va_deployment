@@ -11,6 +11,12 @@ import sys
 import json
 import subprocess
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 
 def check(name: str, passed: bool, detail: str = "") -> dict:
     icon = "✅" if passed else "❌"
@@ -38,6 +44,9 @@ def run_checks():
                          os.path.exists(os.path.join(base, ".env.example"))))
     results.append(check("requirements.txt exists",
                          os.path.exists(os.path.join(base, "requirements.txt"))))
+    for module in ["auth.py", "rate_limiter.py", "cost_guard.py"]:
+        results.append(check(f"app/{module} exists",
+                             os.path.exists(os.path.join(base, "app", module))))
     results.append(check("railway.toml or render.yaml exists",
                          os.path.exists(os.path.join(base, "railway.toml")) or
                          os.path.exists(os.path.join(base, "render.yaml"))))

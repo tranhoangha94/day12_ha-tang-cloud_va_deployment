@@ -46,18 +46,19 @@ Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
 # 1. Setup
 cp .env.example .env
 
-# 2. Chạy với Docker Compose
-docker compose up
+# 2. Chạy full stack (3 agent replicas + Redis + Nginx)
+docker compose up --build --scale agent=3 -d
 
-# 3. Test
-curl http://localhost/health
+# 3. Test qua Nginx (port 8888)
+curl http://localhost:8888/health
+curl http://localhost:8888/ready
 
 # 4. Lấy API key từ .env, test endpoint
 API_KEY=$(grep AGENT_API_KEY .env | cut -d= -f2)
 curl -H "X-API-Key: $API_KEY" \
-     -X POST http://localhost/ask \
+     -X POST http://localhost:8888/ask \
      -H "Content-Type: application/json" \
-     -d '{"question": "What is deployment?"}'
+     -d '{"user_id":"user1","question":"What is deployment?"}'
 ```
 
 ---

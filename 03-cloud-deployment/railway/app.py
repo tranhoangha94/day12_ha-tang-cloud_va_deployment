@@ -25,7 +25,7 @@ app.add_middleware(
 @app.get("/")
 def root():
     return {
-        "message": "AI Agent running on Railway!",
+        "message": f"AI Agent running on {os.getenv('PLATFORM', 'cloud')}!",
         "docs": "/docs",
         "health": "/health",
     }
@@ -40,7 +40,7 @@ async def ask_agent(request: Request):
     return {
         "question": question,
         "answer": ask(question),
-        "platform": "Railway",
+        "platform": os.getenv("PLATFORM", "cloud"),
     }
 
 
@@ -53,7 +53,7 @@ def health():
     return {
         "status": "ok",
         "uptime_seconds": round(time.time() - START_TIME, 1),
-        "platform": "Railway",
+        "platform": os.getenv("PLATFORM", "cloud"),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

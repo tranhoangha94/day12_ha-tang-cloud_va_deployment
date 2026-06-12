@@ -1,0 +1,10 @@
+01-localhost-vs-production
+02-docker
+04-api-gateway
+05-scaling-reliability
+06-lab-complete
+Dockerfile_examples
+.git
+**/__pycache__
+**/.env
+**/.env.local
